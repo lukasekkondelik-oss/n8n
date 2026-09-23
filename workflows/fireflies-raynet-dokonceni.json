@@ -1,0 +1,829 @@
+{
+  "name": "Fireflies → Raynet dokončení",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "4d952636-a189-4993-8260-6200b228a036",
+        "options": {
+          "noResponseBody": false
+        }
+      },
+      "id": "d7168345-fd1d-4e89-b724-a534815afcf0",
+      "name": "Fireflies Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3456,
+        112
+      ],
+      "webhookId": "4d952636-a189-4993-8260-6200b228a036"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "meetingId",
+              "name": "meetingId",
+              "value": "={{ $json.body?.meeting_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3c6b1ae0-e6e6-4710-bb1b-e3fa2fb0505b",
+      "name": "Normalize Webhook Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3248,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.fireflies.ai/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"query\":\"query Transcript($id: String!) { transcript(id: $id) { title organizer_email participants summary { overview action_items } sentences { text speaker_name } } }\",\"variables\":{\"id\":\"{{ $json.meetingId }}\"}}",
+        "options": {}
+      },
+      "id": "86e3ff87-b0fb-4f2d-a08b-7dd7919fdc51",
+      "name": "Get Fireflies Transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3024,
+        112
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "tsCUHSxZuRWofszA",
+          "name": "Fireflies API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Název schůzky: {{ $json.data.transcript.title }}\nÚčastníci: {{ JSON.stringify($json.data.transcript.participants) }}\nOrganizátor (poradce): {{ $json.data.transcript.organizer_email }}\nFireflies souhrn: {{ $json.data.transcript.summary.overview }}\nFireflies action items: {{ $json.data.transcript.summary.action_items }}\n\nPřepis (řečník: text):\n{{ $json.data.transcript.sentences.map(s => s.speaker_name + \": \" + s.text).join(\"\\n\") }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Jsi asistent finančního poradce. Z přepisu schůzky připravuješ podklad pro zápis do CRM Raynet a pro email klientovi.\n\n=== 1) URČENÍ KLIENTA (nejdůležitější část) ===\n- Poradce je VŽDY osoba s e-mailem uvedeným jako Organizátor. Poradce NIKDY není klient.\n- Prioritní zdroj jména klienta: NÁZEV SCHŮZKY. Poradce si schůzky pojmenovává podle klientů, takže pokud název obsahuje jméno osoby, použij ho.\n- Druhý zdroj: seznam účastníků (kdokoli kromě organizátora).\n- Třetí zdroj: oslovení v přepisu (\"pane Nováku\", \"paní Višinská\", \"Veroniko\").\n- Jméno VŽDY převeď do 1. PÁDU (nominativu). Příklady: \"s paní Višinskou\" -> Veronika Višinská; \"panu Novákovi\" -> Jan Novák; \"domluvili jsme se s Dvořákovou\" -> Dvořáková.\n- Odstraň tituly (Ing., Mgr., Bc., MBA, DiS., MUDr.) a oslovení (pan, paní, pí).\n- Vrať odděleně clientFirstName a clientLastName. Pokud znáš jen příjmení, clientFirstName nech prázdné.\n- Pokud najdeš e-mail klienta mezi účastníky, vyplň clientEmail (nikdy tam nedávej e-mail organizátora).\n- clientNameSource: odkud jsi jméno vzal (\"title\", \"participants\" nebo \"transcript\").\n- confidence: \"high\" pokud je jméno jednoznačné, \"medium\" pokud sis ho poskládal z kontextu, \"low\" pokud si nejsi jistý nebo je klientů víc.\n- NIKDY si jméno nevymýšlej. Když nevíš, dej confidence \"low\".\n\n=== 2) SHRNUTÍ (pole shrnutiOdstavce) ===\nKratší věcné odstavce v češtině. První odstavec typicky začíná 'Domluveno: ...' a popisuje hlavní dohodu, další odstavce doplňují kontext, okolnosti nebo důvody rozhodnutí. Formální, neosobní tón, stejný styl jako shrnutí generovaná AI v CRM.\n\n=== 3) DŮLEŽITÉ BODY (pole dulezitebody) ===\nKrátké věty, každá uvozená jedním vhodným emoji podle tématu (📝 dokument/smlouva, 💰 peníze/platba, 📅 termín/datum, 📈 investice, 🏦 fond/banka, 🛡️ pojištění).\n\nPiš v češtině, věcně a stručně, bez oslovení klienta - text bude vložen do firemní emailové šablony."
+        }
+      },
+      "id": "84a4e789-b07f-44f8-b3ac-66e0e0c57771",
+      "name": "Extract Client Name & Summary",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2816,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "52a7f06e-2a4e-4a7b-aca6-07e047b5dc22",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -2816,
+        336
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ffJ0VJ1SjwrBDw6B",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"clientFirstName\": \"Jan\", \"clientLastName\": \"Novák\", \"clientEmail\": \"jan.novak@email.cz\", \"clientNameSource\": \"title\", \"confidence\": \"high\", \"shrnutiOdstavce\": [\"Domluveno: stručný popis hlavní dohody.\", \"Další odstavec shrnutí podle potřeby (kontext, okolnosti, důvody rozhodnutí).\"], \"dulezitebody\": [\"📝 Konkrétní dohodnutý bod nebo dokument.\", \"💰 Konkrétní bod týkající se peněz/plateb.\", \"📅 Konkrétní bod týkající se termínu.\"]}"
+      },
+      "id": "29190e17-d502-41ea-8e1e-4fe45545d030",
+      "name": "Meeting Summary Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -2672,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Připraví kandidáty pro hledání v Raynetu.\n// Klíčová myšlenka: nehledáme celé jméno (skloňování + diakritika),\n// ale KMEN PŘÍJMENÍ. \"Višinskou\" i \"Višinská\" -> \"Višin\".\n\nconst out = $json.output || {};\nconst t = $('Get Fireflies Transcript').first().json.data.transcript || {};\n\nconst strip = (s) => (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n\nconst first = (out.clientFirstName || '').trim();\nconst last  = (out.clientLastName || '').trim();\n\n// useknu koncovku -> obejdu skloňování (\"Višinskou\" -> \"Višinsk\")\nconst stem = last.length > 5 ? last.slice(0, -2) : last;\n\nconst organizer = (t.organizer_email || '').toLowerCase();\nconst participants = (t.participants || []).filter(p => typeof p === 'string');\nconst clientEmail = (\n  out.clientEmail ||\n  participants.find(p => p.toLowerCase() !== organizer && p.includes('@')) ||\n  ''\n).toLowerCase();\n\nconst confidence = out.confidence || 'low';\n\nreturn [{\n  json: {\n    clientFirstName: first,\n    clientLastName: last,\n    clientName: (first + ' ' + last).trim(),\n    clientNameAscii: strip((first + ' ' + last).trim()).toLowerCase(),\n    clientEmail,\n    confidence,\n    clientNameSource: out.clientNameSource || 'unknown',\n    stem,\n    stemAscii: strip(stem),\n    meetingTitle: t.title || '',\n    organizerEmail: t.organizer_email || '',\n    // pojistka: bez příjmení nebo při nízké jistotě do CRM vůbec nesaháme\n    skipCrm: !last || confidence === 'low',\n    shrnutiOdstavce: out.shrnutiOdstavce || [],\n    dulezitebody: out.dulezitebody || []\n  }\n}];"
+      },
+      "id": "ac3ba3ca-7092-476d-92b3-af757ea47fc8",
+      "name": "Připravit hledání",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2512,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://app.raynet.cz/api/v2/company/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name[LIKE_NOCASE]",
+              "value": "=%{{ $json.stem }}%"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Instance-Name",
+              "value": "financehb"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "668b6806-f6fa-43c4-ad65-7094f86075f3",
+      "name": "Hledat klienta – příjmení",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2304,
+        112
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fI3eN9078b1dcap6",
+          "name": "Raynet API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://app.raynet.cz/api/v2/company/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fulltext",
+              "value": "={{ $('Připravit hledání').first().json.stem }}"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Instance-Name",
+              "value": "financehb"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "42f24044-05e0-4cd5-8ff7-489970d08b38",
+      "name": "Hledat klienta – fulltext",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2096,
+        112
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fI3eN9078b1dcap6",
+          "name": "Raynet API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sloučí výsledky obou hledání, oboduje kandidáty a rozhodne,\n// jestli je shoda jednoznačná. Tady se dělá skutečné párování - ne v API dotazu.\n\nconst prep = $('Připravit hledání').first().json;\n\nconst strip = (s) => (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();\n\n// --- posbírej kandidáty z obou hledání a zaznamenej, pokud samotné hledání selhalo ---\nconst searchErrors = [];\nconst collect = (nodeName) => {\n  let items = [];\n  try {\n    items = $(nodeName).all();\n  } catch (e) {\n    return [];\n  }\n  return items.flatMap(i => {\n    if (i.json && Array.isArray(i.json.data)) return i.json.data;\n    if (i.json && i.json.error) {\n      searchErrors.push(nodeName + ': ' + JSON.stringify(i.json.error).slice(0, 300));\n    }\n    return [];\n  });\n};\n\nconst raw = [...collect('Hledat klienta – příjmení'), ...collect('Hledat klienta – fulltext')];\n\n// deduplikace podle id\nconst byId = {};\nfor (const c of raw) { if (c && c.id) byId[c.id] = c; }\nconst candidates = Object.values(byId);\n\n// --- vytáhni e-mail z Raynet záznamu (je zanořený v adresách) ---\nconst emailOf = (c) => {\n  const buckets = [];\n  if (c.primaryAddress) buckets.push(c.primaryAddress);\n  if (Array.isArray(c.addresses)) buckets.push(...c.addresses);\n  if (c.contactInfo) buckets.push({ contactInfo: c.contactInfo });\n  for (const b of buckets) {\n    const e = b && b.contactInfo && b.contactInfo.email;\n    if (e) return String(e).toLowerCase();\n  }\n  return '';\n};\n\n// --- bodování ---\nconst wantEmail = (prep.clientEmail || '').toLowerCase();\nconst wantLast  = strip(prep.clientLastName);\nconst wantFirst = strip(prep.clientFirstName);\nconst wantStem  = strip(prep.stem);\n\nconst scored = candidates.map(c => {\n  const name = strip(c.name);\n  const cLast = strip(c.lastName);\n  const cFirst = strip(c.firstName);\n  const cEmail = emailOf(c);\n\n  let score = 0;\n  const why = [];\n  if (wantEmail && cEmail && cEmail === wantEmail) { score += 100; why.push('email'); }\n  if (wantLast && cLast && cLast === wantLast)     { score += 50;  why.push('příjmení'); }\n  if (wantFirst && cFirst && cFirst === wantFirst) { score += 25;  why.push('křestní'); }\n  if (wantLast && !cLast && name.includes(wantLast)) { score += 40; why.push('jméno obsahuje příjmení'); }\n  if (wantFirst && name.includes(wantFirst))       { score += 10;  why.push('jméno obsahuje křestní'); }\n  if (wantStem && name.includes(wantStem))         { score += 10;  why.push('kmen'); }\n\n  return { id: c.id, name: c.name, email: cEmail, score, why: why.join(', ') };\n}).sort((a, b) => b.score - a.score);\n\n// --- rozhodnutí ---\nlet matchStatus = 'notfound';\nlet match = null;\n\nif (prep.skipCrm) {\n  matchStatus = 'skipped';\n} else if (searchErrors.length > 0 && scored.length === 0) {\n  // Hledání v Raynetu selhalo (API/síť) a nemáme žádné kandidáty -> nevíme,\n  // jestli klient existuje. NESMÍ se to vydávat za \"nenalezeno\", ať se kvůli\n  // výpadku API nezaloží zbytečně duplicitní klient.\n  matchStatus = 'search_error';\n} else if (scored.length === 0) {\n  matchStatus = 'notfound';\n} else {\n  const top = scored[0];\n  const second = scored[1];\n  const clearWinner = !second || (top.score - second.score) >= 25;\n  if (top.score >= 50 && clearWinner) {\n    matchStatus = 'matched';\n    match = top;\n  } else if (top.score >= 50) {\n    matchStatus = 'ambiguous';\n  } else {\n    matchStatus = 'notfound';\n  }\n}\n\n// --- texty pro zápis a email ---\nconst summaryText = (prep.shrnutiOdstavce || []).join('\\n\\n');\nconst keyPointsText = (prep.dulezitebody || []).join('\\n- ');\nconst htmlBody =\n  '<h2>Výsledek jednání</h2><p><em>Shrnutí</em></p>' +\n  (prep.shrnutiOdstavce || []).map(p => '<p>' + p + '</p>').join('') +\n  '<p><strong>Důležité body:</strong></p><ul>' +\n  (prep.dulezitebody || []).map(b => '<li>' + b + '</li>').join('') +\n  '</ul>';\n\nreturn [{\n  json: {\n    matchStatus,\n    companyId: match ? match.id : null,\n    matchedName: match ? match.name : null,\n    matchReason: match ? match.why : null,\n    clientFirstName: prep.clientFirstName,\n    clientLastName: prep.clientLastName,\n    clientEmailForDraft: prep.clientEmail || (match ? match.email : '') || '',\n    clientName: prep.clientName,\n    confidence: prep.confidence,\n    clientNameSource: prep.clientNameSource,\n    meetingTitle: prep.meetingTitle,\n    summaryText,\n    keyPointsText,\n    htmlBody,\n    searchErrorInfo: searchErrors.join(' | '),\n    candidatesPreview: scored.slice(0, 5)\n      .map(c => `#${c.id} ${c.name} (skóre ${c.score}${c.why ? ', ' + c.why : ''})`)\n      .join('\\n') || '(žádní kandidáti)'\n  }\n}];"
+      },
+      "id": "a517a7e1-48cc-4d13-bb15-9bf7ac549016",
+      "name": "Vyhodnotit shodu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1888,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "75836ca0-daae-4048-9d3c-2fa174fc08f9",
+              "leftValue": "={{ $json.matchStatus }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "matched"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "80f840c1-3f32-40d0-b44d-ec9b78dbb19e",
+      "name": "Klient jednoznačně nalezen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1680,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "67b78cfd-e659-4dbd-bfff-f4e28092f4c0",
+              "leftValue": "={{ $json.matchStatus }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "notfound"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a76e651c-fd6f-498e-9f01-0056340e336f",
+      "name": "Klient v Raynetu nenalezen – založit nového?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1680,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Výchozí hodnoty pro založení NOVÉHO klienta v Raynetu.\n// !! owner.id MUSÍ být reálné ID uživatele (poradce) v Raynetu - bez něj API\n// založení odmítne. role/state/rating uprav podle vlastního nastavení v Raynetu\n// (Nastavení -> Firmy -> stavy/hodnocení), tady jsou jen rozumné výchozí hodnoty.\nreturn [{\n  json: {\n    ...$json,\n    raynetOwnerId: 0, // TODO: doplnit skutečné ID vlastníka v Raynetu\n    raynetRole: 'A_SUBSCRIBER',\n    raynetState: 'B_ACTUAL',\n    raynetRating: 'B'\n  }\n}];"
+      },
+      "id": "186da46e-f3a3-4be6-8745-fc805410ac32",
+      "name": "Nastavení nového klienta v Raynetu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1440,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.raynet.cz/api/v2/company/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Instance-Name",
+              "value": "financehb"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  name: $json.clientName,\n  firstName: $json.clientFirstName || null,\n  lastName: $json.clientLastName,\n  person: true,\n  role: $json.raynetRole,\n  state: $json.raynetState,\n  rating: $json.raynetRating,\n  owner: { id: $json.raynetOwnerId },\n  ...(($json.clientEmailForDraft) ? { contactInfo: { email: $json.clientEmailForDraft } } : {})\n}) }}",
+        "options": {}
+      },
+      "id": "613aae01-2963-406a-b704-14dc621cad12",
+      "name": "Založit nového klienta v Raynetu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1200,
+        320
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fI3eN9078b1dcap6",
+          "name": "Raynet API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9fbcaf80-4fc1-45b7-81ec-0ff91370b818",
+              "leftValue": "={{ $json.id ? String($json.id) : '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0920024f-613b-4c81-81b1-a296b937aae5",
+      "name": "Klient v Raynetu založen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -960,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Klient byl v Raynetu úspěšně založen - sloučí jeho nové ID zpátky\n// s daty ze schůzky, aby pokračoval do stejného zápisu aktivity jako\n// klienti, kteří už v Raynetu existovali.\nconst created = $json;\nconst original = $('Vyhodnotit shodu').first().json;\nreturn [{\n  json: {\n    ...original,\n    companyId: created.id,\n    matchStatus: 'created'\n  }\n}];"
+      },
+      "id": "4ba3a236-c9e2-443e-b790-6be39b212190",
+      "name": "Sloučit nově založeného klienta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Založení nového klienta v Raynetu selhalo (např. špatné owner.id,\n// chybějící povinné pole, výpadek API). Notes ze schůzky se nesmí ztratit\n// potichu - jde to na ruční kontrolu s detailem chyby.\nconst original = $('Vyhodnotit shodu').first().json;\nreturn [{\n  json: {\n    ...original,\n    matchStatus: 'create_failed',\n    createError: JSON.stringify($json).slice(0, 2000)\n  }\n}];"
+      },
+      "id": "0914f377-b841-44ba-a3a9-e2c84e09a265",
+      "name": "Připravit selhání založení klienta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.raynet.cz/api/v2/activity/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Instance-Name",
+              "value": "financehb"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  title: 'Schůzka – ' + $json.meetingTitle,\n  description: $json.summaryText + '\\n\\nKlíčové body a úkoly:\\n- ' + $json.keyPointsText,\n  type: 'MEETING',\n  completed: true,\n  company: { id: $json.companyId }\n}) }}",
+        "options": {}
+      },
+      "id": "1529c147-ea8f-46db-b390-e3b7c65cc64f",
+      "name": "Vytvořit záznam v Raynetu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -480,
+        112
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "fI3eN9078b1dcap6",
+          "name": "Raynet API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ab854942-6038-4cff-97fe-cafd1c7a2add",
+              "leftValue": "={{ $json.id ? String($json.id) : '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dc71466e-5e0c-481b-a5b9-ee572b53d02d",
+      "name": "Aktivita v Raynetu zapsána?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zápis poznámky ze schůzky do Raynetu selhal, i když klient existuje/byl\n// založen. Notes se nesmí ztratit potichu - jde to na ruční kontrolu.\nconst original = $('Vyhodnotit shodu').first().json;\nreturn [{\n  json: {\n    ...original,\n    matchStatus: 'activity_failed',\n    createError: JSON.stringify($json).slice(0, 2000)\n  }\n}];"
+      },
+      "id": "c9cc698d-8ed0-4a4d-b2df-3f7d77b2b1b2",
+      "name": "Připravit selhání zápisu aktivity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Shrnutí naší schůzky - {{ $('Vyhodnotit shodu').first().json.meetingTitle }}",
+        "emailType": "html",
+        "message": "={{ $('Vyhodnotit shodu').first().json.htmlBody }}",
+        "options": {
+          "sendTo": "={{ $('Vyhodnotit shodu').first().json.clientEmailForDraft }}"
+        }
+      },
+      "id": "94d5a945-4a52-4299-a485-15b56b91fe5f",
+      "name": "Připravit draft emailu ke schválení",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "cdd51ca4-ad27-4b17-bdf6-3ca6f2ef16df",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "vyHpj0Otlg2Yw0Tr",
+          "name": "Gmail petr@financehb.cz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "petr@financehb.cz",
+        "subject": "=Raynet – nutná ruční kontrola schůzky – {{ $json.clientName }}",
+        "emailType": "text",
+        "message": "=Schůzku se nepodařilo plně automaticky zapsat ke klientovi v Raynetu.\n\nKlient podle AI: {{ $json.clientName }}\nJistota AI: {{ $json.confidence }} (zdroj jména: {{ $json.clientNameSource }})\nDůvod: {{ $json.matchStatus }}\n  matched         = OK (sem se to nemá dostat)\n  skipped         = AI si nebyla jistá jménem, do CRM se vůbec nehledalo\n  notfound        = v Raynetu nenalezen odpovídající klient a ani se nepodařilo založit nového (viz create_failed)\n  ambiguous       = nalezeno víc podobně vypadajících záznamů, nelze rozhodnout automaticky\n  search_error    = hledání v Raynetu selhalo (API/síť) - nejde ověřit, jestli klient existuje, proto se nezakládal nový\n  create_failed   = nepodařilo se automaticky založit nového klienta v Raynetu (chyba API)\n  activity_failed = klient existuje/byl založen, ale nepodařilo se zapsat poznámku ze schůzky (chyba API)\n\n{{ ($json.createError || $json.searchErrorInfo) ? ('Detail chyby:\\n' + ($json.createError || $json.searchErrorInfo) + '\\n') : '' }}\nNalezení kandidáti v Raynetu:\n{{ $json.candidatesPreview || '(nehledalo se)' }}\n\nSchůzka: {{ $json.meetingTitle }}\n\nShrnutí schůzky:\n{{ $json.summaryText }}\n\nKlíčové body:\n- {{ $json.keyPointsText }}",
+        "options": {}
+      },
+      "id": "1ecc2f38-ec3a-462f-aa9f-e9f1ced1e69e",
+      "name": "Upozornit na ruční kontrolu",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1680,
+        560
+      ],
+      "webhookId": "4b68a8c6-ca7c-4e04-a89f-0d2e38b715a3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "vyHpj0Otlg2Yw0Tr",
+          "name": "Gmail petr@financehb.cz"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fireflies Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Webhook Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Webhook Data": {
+      "main": [
+        [
+          {
+            "node": "Get Fireflies Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Fireflies Transcript": {
+      "main": [
+        [
+          {
+            "node": "Extract Client Name & Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Client Name & Summary": {
+      "main": [
+        [
+          {
+            "node": "Připravit hledání",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Client Name & Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meeting Summary Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract Client Name & Summary",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Připravit hledání": {
+      "main": [
+        [
+          {
+            "node": "Hledat klienta – příjmení",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hledat klienta – příjmení": {
+      "main": [
+        [
+          {
+            "node": "Hledat klienta – fulltext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hledat klienta – fulltext": {
+      "main": [
+        [
+          {
+            "node": "Vyhodnotit shodu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vyhodnotit shodu": {
+      "main": [
+        [
+          {
+            "node": "Klient jednoznačně nalezen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Klient jednoznačně nalezen?": {
+      "main": [
+        [
+          {
+            "node": "Vytvořit záznam v Raynetu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Klient v Raynetu nenalezen – založit nového?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Klient v Raynetu nenalezen – založit nového?": {
+      "main": [
+        [
+          {
+            "node": "Nastavení nového klienta v Raynetu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upozornit na ruční kontrolu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nastavení nového klienta v Raynetu": {
+      "main": [
+        [
+          {
+            "node": "Založit nového klienta v Raynetu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Založit nového klienta v Raynetu": {
+      "main": [
+        [
+          {
+            "node": "Klient v Raynetu založen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Klient v Raynetu založen?": {
+      "main": [
+        [
+          {
+            "node": "Sloučit nově založeného klienta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Připravit selhání založení klienta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sloučit nově založeného klienta": {
+      "main": [
+        [
+          {
+            "node": "Vytvořit záznam v Raynetu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Připravit selhání založení klienta": {
+      "main": [
+        [
+          {
+            "node": "Upozornit na ruční kontrolu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vytvořit záznam v Raynetu": {
+      "main": [
+        [
+          {
+            "node": "Aktivita v Raynetu zapsána?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aktivita v Raynetu zapsána?": {
+      "main": [
+        [
+          {
+            "node": "Připravit draft emailu ke schválení",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Připravit selhání zápisu aktivity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Připravit selhání zápisu aktivity": {
+      "main": [
+        [
+          {
+            "node": "Upozornit na ruční kontrolu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bcfeea95-59d7-4cd6-9695-8448df00bd2a",
+  "meta": {
+    "instanceId": "d55097a402981831a4bf54de6a6dda7ef94b86bc1086123f072cc6f7c129f5ff"
+  },
+  "nodeGroups": [],
+  "id": "R996QJbfhw5WMuDM",
+  "tags": []
+}
