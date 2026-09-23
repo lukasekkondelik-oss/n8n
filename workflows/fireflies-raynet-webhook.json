@@ -1,0 +1,218 @@
+{
+  "name": "Fireflies → Raynet – webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "4d952636-a189-4993-8260-6200b228a036",
+        "options": {
+          "noResponseBody": false
+        }
+      },
+      "id": "9d70fa72-63bb-47a0-9f8b-a4367e4793a5",
+      "name": "Fireflies Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1936,
+        112
+      ],
+      "webhookId": "4d952636-a189-4993-8260-6200b228a036"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "meetingId",
+              "name": "meetingId",
+              "value": "={{ $json.body?.meeting_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "39662023-3a69-489f-a4a8-c1a6100c1676",
+      "name": "Normalize Webhook Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1728,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "TODO_VYBER_SUBWORKFLOW_PO_IMPORTU",
+          "cachedResultName": "Fireflies → Raynet – zpracování schůzky (sub-workflow)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "meetingId": "={{ $json.meetingId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "meetingId",
+              "displayName": "meetingId",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "236bcfde-e179-4fdb-aa94-ceed59180e4a",
+      "name": "Zavolat zpracování schůzky",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -1504,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "559a12cc-dddb-494b-8ce9-d7887a9f5ba2",
+              "leftValue": "={{ $json.matchStatus }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "skipped"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b995b7a4-ee99-4cc8-86d5-a1f149640334",
+      "name": "Nepodařilo se určit jméno?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1280,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "TODO_DOPLNIT_ID_GOOGLE_SHEETU"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fronta"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "meetingId"
+          ],
+          "value": {
+            "meetingId": "={{ $json.meetingId }}",
+            "meetingTitle": "={{ $json.meetingTitle }}",
+            "status": "pending",
+            "firstQueuedAt": "={{ $now.toISO() }}",
+            "lastTriedAt": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "1eab8d23-7663-4444-88c9-25c5e55c405b",
+      "name": "Přidat do fronty na večer",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1056,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TODO_DOPLNIT_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Fireflies Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Webhook Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Webhook Data": {
+      "main": [
+        [
+          {
+            "node": "Zavolat zpracování schůzky",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zavolat zpracování schůzky": {
+      "main": [
+        [
+          {
+            "node": "Nepodařilo se určit jméno?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nepodařilo se určit jméno?": {
+      "main": [
+        [
+          {
+            "node": "Přidat do fronty na večer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8bba7e6c-ab1a-47c6-9b66-d46929f958d3",
+  "meta": {
+    "instanceId": "d55097a402981831a4bf54de6a6dda7ef94b86bc1086123f072cc6f7c129f5ff"
+  },
+  "nodeGroups": [],
+  "id": "e6a7f108-711d-4170-beaf-fade99fcad45",
+  "tags": []
+}

@@ -1,0 +1,297 @@
+{
+  "name": "Fireflies → Raynet – večerní dohledání",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "6cf5d90a-d75d-42ae-8b10-4938101c3df6",
+      "name": "Každý den ve 20:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1936,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "TODO_DOPLNIT_ID_GOOGLE_SHEETU"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fronta"
+        },
+        "options": {}
+      },
+      "id": "c960595a-6820-40d5-a6e8-2cfb18d5f8be",
+      "name": "Načíst frontu",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1712,
+        112
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TODO_DOPLNIT_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Jen radky, co jeste nejsou vyresene.\nreturn $input.all().filter(i => (i.json.status || 'pending') !== 'done');"
+      },
+      "id": "560d76d2-4070-4ded-bfb5-7d4ba6ec67fa",
+      "name": "Jen čekající",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1488,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "TODO_VYBER_SUBWORKFLOW_PO_IMPORTU",
+          "cachedResultName": "Fireflies → Raynet – zpracování schůzky (sub-workflow)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "meetingId": "={{ $json.meetingId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "meetingId",
+              "displayName": "meetingId",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ff409707-e5f0-455c-a818-2f9325c266ea",
+      "name": "Zavolat zpracování schůzky",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -1264,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b9df80bd-ffdd-4fb7-ad3f-533fae959930",
+              "leftValue": "={{ $json.matchStatus }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": "skipped"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a43a8b3b-66fb-4d1e-a432-2cb002c71e65",
+      "name": "Teď už vyřešeno?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1040,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "TODO_DOPLNIT_ID_GOOGLE_SHEETU"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fronta"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "meetingId"
+          ],
+          "value": {
+            "meetingId": "={{ $json.meetingId }}",
+            "status": "done",
+            "lastTriedAt": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "33b7be26-827a-4f11-a51b-9c1daf566718",
+      "name": "Označit ve frontě jako vyřešené",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -816,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TODO_DOPLNIT_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "TODO_DOPLNIT_ID_GOOGLE_SHEETU"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Fronta"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "meetingId"
+          ],
+          "value": {
+            "meetingId": "={{ $json.meetingId }}",
+            "meetingTitle": "={{ $json.meetingTitle }}",
+            "status": "pending",
+            "lastTriedAt": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "f2be96d3-4a2b-460b-9706-ca44f065925a",
+      "name": "Ponechat ve frontě",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -816,
+        220
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TODO_DOPLNIT_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Každý den ve 20:00": {
+      "main": [
+        [
+          {
+            "node": "Načíst frontu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Načíst frontu": {
+      "main": [
+        [
+          {
+            "node": "Jen čekající",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jen čekající": {
+      "main": [
+        [
+          {
+            "node": "Zavolat zpracování schůzky",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zavolat zpracování schůzky": {
+      "main": [
+        [
+          {
+            "node": "Teď už vyřešeno?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Teď už vyřešeno?": {
+      "main": [
+        [
+          {
+            "node": "Označit ve frontě jako vyřešené",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ponechat ve frontě",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c960595a-6820-40d5-a6e8-2cfb18d5f8be",
+  "meta": {
+    "instanceId": "d55097a402981831a4bf54de6a6dda7ef94b86bc1086123f072cc6f7c129f5ff"
+  },
+  "nodeGroups": [],
+  "id": "94159a90-3aa3-403c-ab67-e785f9a8f822",
+  "tags": []
+}
